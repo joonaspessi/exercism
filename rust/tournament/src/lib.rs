@@ -1,12 +1,26 @@
-use std::{fmt::format, vec};
+use std::cmp::Reverse;
+use std::collections::HashMap;
 
 #[derive(Debug)]
+struct Teams {
+    teams: HashMap<String, Team>,
+}
+
+impl Teams {
+    pub fn sorted(&self) -> Vec<Team> {
+        let mut teams: Vec<Team> = self.teams.values().cloned().collect();
+        teams.sort_by_key(|team| Reverse(team.points()));
+        teams
+    }
+}
+
+#[derive(Debug, Clone)]
 struct Team {
     name: String,
     matches: Vec<Match>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Match {
     Win,
     Lose,
@@ -74,7 +88,7 @@ fn header() -> String {
     header
 }
 
-fn parse(input: String) -> Vec<Team> {
+fn parse(input: String) -> Teams {
     let parts: Vec<(&str, &str, bool)> = input
         .lines()
         .map(|line| {
@@ -85,35 +99,46 @@ fn parse(input: String) -> Vec<Team> {
             (team_a, team_b, winner)
         })
         .collect();
+    let mut teams_map = Teams {
+        teams: HashMap::new(),
+    };
 
-    let mut teams = vec![];
     for part in parts {
         let (team_a_name, team_b_name, is_a_winner) = part;
 
-        let team_a = Team {
-            name: team_a_name.to_string(),
-            matches: vec![if is_a_winner { Match::Win } else { Match::Lose }],
-        };
+        let team_a = teams_map
+            .teams
+            .entry(team_a_name.to_string())
+            .or_insert(Team {
+                name: team_a_name.to_string(),
+                matches: vec![],
+            });
 
-        let team_b = Team {
-            name: team_b_name.to_string(),
-            matches: vec![if !is_a_winner {
-                Match::Win
-            } else {
-                Match::Lose
-            }],
-        };
+        team_a
+            .matches
+            .push(if is_a_winner { Match::Win } else { Match::Lose });
 
-        teams.push(team_a);
-        teams.push(team_b);
+        let team_b = teams_map
+            .teams
+            .entry(team_b_name.to_string())
+            .or_insert(Team {
+                name: team_b_name.to_string(),
+                matches: vec![],
+            });
+
+        team_b.matches.push(if !is_a_winner {
+            Match::Win
+        } else {
+            Match::Lose
+        });
     }
-    teams
+    teams_map
 }
 
 pub fn tally(match_results: &str) -> String {
     let teams = parse(match_results.to_string());
     let mut result = vec![header()];
-    for team in teams {
+    for team in teams.sorted() {
         result.push(team.info())
     }
 
