@@ -9,7 +9,10 @@ struct Teams {
 impl Teams {
     pub fn sorted(&self) -> Vec<Team> {
         let mut teams: Vec<Team> = self.teams.values().cloned().collect();
-        teams.sort_by_key(|team| Reverse(team.points()));
+        teams.sort_by(|a, b| match a.points().cmp(&b.points()).reverse() {
+            std::cmp::Ordering::Equal => a.name.cmp(&b.name),
+            other => other,
+        });
         teams
     }
 }
@@ -89,13 +92,19 @@ fn header() -> String {
 }
 
 fn parse(input: String) -> Teams {
-    let parts: Vec<(&str, &str, bool)> = input
+    let parts: Vec<(&str, &str, Match)> = input
         .lines()
         .map(|line| {
             let mut components = line.split(';');
             let team_a = components.next().unwrap().trim();
             let team_b = components.next().unwrap().trim();
-            let winner = matches!(components.next().unwrap().trim(), "win");
+
+            let winner = match components.next().unwrap().trim() {
+                "win" => Match::Win,
+                "loss" => Match::Lose,
+                "draw" => Match::Tie,
+                _ => panic!("should not happen"),
+            };
             (team_a, team_b, winner)
         })
         .collect();
@@ -104,32 +113,24 @@ fn parse(input: String) -> Teams {
     };
 
     for part in parts {
-        let (team_a_name, team_b_name, is_a_winner) = part;
+        let (team_a_name, team_b_name, match_status) = part;
 
         let team_a = teams_map
             .teams
             .entry(team_a_name.to_string())
-            .or_insert(Team {
-                name: team_a_name.to_string(),
-                matches: vec![],
-            });
+            .or_insert_with(|| Team::new(team_a_name.to_string()));
 
-        team_a
-            .matches
-            .push(if is_a_winner { Match::Win } else { Match::Lose });
+        team_a.add_match(match_status.clone());
 
         let team_b = teams_map
             .teams
             .entry(team_b_name.to_string())
-            .or_insert(Team {
-                name: team_b_name.to_string(),
-                matches: vec![],
-            });
+            .or_insert_with(|| Team::new(team_b_name.to_string()));
 
-        team_b.matches.push(if !is_a_winner {
-            Match::Win
-        } else {
-            Match::Lose
+        team_b.add_match(match match_status {
+            Match::Win => Match::Lose,
+            Match::Lose => Match::Win,
+            Match::Tie => Match::Tie,
         });
     }
     teams_map
